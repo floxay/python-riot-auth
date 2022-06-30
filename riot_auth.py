@@ -13,7 +13,7 @@ import aiohttp
 
 class RiotAuth:
     RIOT_CLIENT_USER_AGENT = (
-        "RiotClient/53.0.0.4494832.4494832 %s (Windows;10;;Professional, x64)"
+        "RiotClient/53.0.0.4494832.4470164 %s (Windows;10;;Professional, x64)"
     )
     CIPHERS13 = ":".join(  # https://docs.python.org/3/library/ssl.html#tls-1-3
         (
@@ -140,16 +140,21 @@ class RiotAuth:
             connector=conn, raise_for_status=True
         ) as session:
             headers = {
-                "Accept": "application/json",
                 "Accept-Encoding": "deflate, gzip, zstd",
                 "user-agent": RiotAuth.RIOT_CLIENT_USER_AGENT % "rso-auth",
+                "Cache-Control": "no-cache",
+                "Accept": "application/json",
             }
             body = {
-                "client_id": "play-valorant-web-prod",
+                "acr_values": "",
+                "claims": "",
+                "client_id": "riot-client",
+                "code_challenge": "",
+                "code_challenge_method": "",
                 "nonce": RiotAuth.generate_random_string(22),
-                "redirect_uri": "https://playvalorant.com/opt_in",
+                "redirect_uri": "http://localhost/redirect",
                 "response_type": "token id_token",
-                "scope": "account openid",
+                "scope": "openid link ban lol_region account"
             }
             if use_query_response_mode:
                 body["response_mode"] = "query"
@@ -161,9 +166,12 @@ class RiotAuth:
                 ...
 
             body = {
-                "type": "auth",
-                "username": username,
+                "language": "en_US",
                 "password": password,
+                "region": None,
+                "remember": False,
+                "type": "auth",
+                "username": username
             }
             async with session.put(
                 "https://auth.riotgames.com/api/v1/authorization",
