@@ -10,8 +10,6 @@ from urllib.parse import parse_qsl, urlsplit
 
 import aiohttp
 
-CREDS = "USERNAME", "PASSWORD"
-
 
 class RiotAuth:
     RIOT_CLIENT_USER_AGENT = (
@@ -213,6 +211,8 @@ if __name__ == "__main__":
     if sys.platform == "win32":
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     # endregion
+
+    CREDS = "USERNAME", "PASSWORD"
 
     auth = RiotAuth()
     asyncio.run(auth.authorize(*CREDS))
