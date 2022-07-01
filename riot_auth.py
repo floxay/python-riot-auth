@@ -86,8 +86,10 @@ class RiotAuth:
             warnings.filterwarnings("ignore", category=DeprecationWarning)
             ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1
         ssl_ctx.set_alpn_protocols(["http/1.1"])
+        ssl_ctx.options |= 1 << 19  # SSL_OP_NO_ENCRYPT_THEN_MAC
         libssl.SSL_CTX_set_ciphersuites(ssl_ctx_addr, RiotAuth.CIPHERS13.encode())
         libssl.SSL_CTX_set_cipher_list(ssl_ctx_addr, RiotAuth.CIPHERS.encode())
+        # setting SSL_CTRL_SET_SIGALGS_LIST
         libssl.SSL_CTX_ctrl(ssl_ctx_addr, 98, 0, RiotAuth.SIGALGS.encode())
 
         # print([cipher["name"] for cipher in ssl_ctx.get_ciphers()])
@@ -154,7 +156,7 @@ class RiotAuth:
                 "nonce": RiotAuth.generate_random_string(22),
                 "redirect_uri": "http://localhost/redirect",
                 "response_type": "token id_token",
-                "scope": "openid link ban lol_region account"
+                "scope": "openid link ban lol_region account",
             }
             if use_query_response_mode:
                 body["response_mode"] = "query"
@@ -171,7 +173,7 @@ class RiotAuth:
                 "region": None,
                 "remember": False,
                 "type": "auth",
-                "username": username
+                "username": username,
             }
             async with session.put(
                 "https://auth.riotgames.com/api/v1/authorization",
