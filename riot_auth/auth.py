@@ -1,19 +1,38 @@
-import base64
 import ctypes
 import json
-import random
 import ssl
 import sys
 import warnings
+from base64 import urlsafe_b64decode
+from secrets import token_urlsafe
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 from urllib.parse import parse_qsl, urlsplit
 
 import aiohttp
 
+from .auth_exceptions import (
+    RiotAuthenticationError,
+    RiotAuthError,
+    RiotMultifactorError,
+    RiotRatelimitError,
+    RiotUnknownErrorTypeError,
+    RiotUnknownResponseTypeError,
+)
+
+__all__ = (
+    "RiotAuthenticationError",
+    "RiotAuthError",
+    "RiotMultifactorError",
+    "RiotRatelimitError",
+    "RiotUnknownErrorTypeError",
+    "RiotUnknownResponseTypeError",
+    "RiotAuth",
+)
+
 
 class RiotAuth:
     RIOT_CLIENT_USER_AGENT = (
-        "RiotClient/53.0.0.4494832.4470164 %s (Windows;10;;Professional, x64)"
+        "RiotClient/52.0.1.4472310.4470164 %s (Windows;10;;Professional, x64)"
     )
     CIPHERS13 = ":".join(  # https://docs.python.org/3/library/ssl.html#tls-1-3
         (
@@ -57,6 +76,7 @@ class RiotAuth:
 
     def __init__(self) -> None:
         self._auth_ssl_ctx = RiotAuth.create_riot_auth_ssl_ctx()
+        self._cookie_jar = aiohttp.CookieJar()
         self.access_token: Optional[str] = None
         self.scope: Optional[str] = None
         self.id_token: Optional[str] = None
@@ -84,7 +104,7 @@ class RiotAuth:
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
-            ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1
+            ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1  # deprecated since 3.10
         ssl_ctx.set_alpn_protocols(["http/1.1"])
         ssl_ctx.options |= 1 << 19  # SSL_OP_NO_ENCRYPT_THEN_MAC
         libssl.SSL_CTX_set_ciphersuites(ssl_ctx_addr, RiotAuth.CIPHERS13.encode())
@@ -95,51 +115,58 @@ class RiotAuth:
         # print([cipher["name"] for cipher in ssl_ctx.get_ciphers()])
         return ssl_ctx
 
-    def update(
+    def __update(
         self,
         extract_jwt: bool = False,
-        keys_attr_pairs: Sequence[Tuple[str, str]] = (
+        key_attr_pairs: Sequence[Tuple[str, str]] = (
             ("sub", "user_id"),
             ("exp", "expires_at"),
         ),
         **kwargs,
     ) -> None:
-        # ONLY PREDEFINED PUBLIC KEYS ARE SET! (see __init__()), rest is silently ignored
+        # ONLY PREDEFINED PUBLIC KEYS ARE SET, rest is silently ignored!
         predefined_keys = [key for key in self.__dict__.keys() if key[0] != "_"]
 
         self.__dict__.update(
             (key, val) for key, val in kwargs.items() if key in predefined_keys
         )
 
-        if extract_jwt:  # extract additional data from JWT
-            additional_data = self.get_keys_from_access_token(keys_attr_pairs)
+        if extract_jwt:  # extract additional data from access JWT
+            additional_data = self.__get_keys_from_access_token(key_attr_pairs)
             self.__dict__.update(
                 (key, val) for key, val in additional_data if key in predefined_keys
             )
 
-    def get_keys_from_access_token(
-        self, keys_attr_pairs: Sequence[Tuple[str, str]]
+    def __get_keys_from_access_token(
+        self, key_attr_pairs: Sequence[Tuple[str, str]]
     ) -> List[
         Tuple[str, Union[str, int, List, Dict, None]]
     ]:  # List[Tuple[str, JSONType]]
         payload = self.access_token.split(".")[1]
-        decoded = base64.urlsafe_b64decode(payload + "===")
+        decoded = urlsafe_b64decode(f"{payload}===")
         temp_dict: Dict = json.loads(decoded)
-        return [(attr, temp_dict.get(key)) for key, attr in keys_attr_pairs]
+        return [(attr, temp_dict.get(key)) for key, attr in key_attr_pairs]
 
-    @staticmethod
-    def generate_random_string(
-        length: int = 22,
-        chars: str = "_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789",
-    ) -> str:
-        return "".join(random.choice(chars) for _ in range(length))
+    def __set_tokens_from_uri(self, data: Dict) -> None:
+        mode = data["response"]["mode"]
+        uri = data["response"]["parameters"]["uri"]
+
+        result = getattr(urlsplit(uri), mode)
+        data = dict(parse_qsl(result))
+        self.__update(extract_jwt=True, **data)
 
     async def authorize(
         self, username: str, password: str, use_query_response_mode: bool = False
     ) -> None:
+        """
+        Authenticate using username and password.
+        """
+        if username and password:
+            self._cookie_jar.clear()
+
         conn = aiohttp.TCPConnector(ssl=self._auth_ssl_ctx)
         async with aiohttp.ClientSession(
-            connector=conn, raise_for_status=True
+            connector=conn, raise_for_status=True, cookie_jar=self._cookie_jar
         ) as session:
             headers = {
                 "Accept-Encoding": "deflate, gzip, zstd",
@@ -147,13 +174,15 @@ class RiotAuth:
                 "Cache-Control": "no-cache",
                 "Accept": "application/json",
             }
+
+            # region Begin auth/Reauth
             body = {
                 "acr_values": "",
                 "claims": "",
                 "client_id": "riot-client",
                 "code_challenge": "",
                 "code_challenge_method": "",
-                "nonce": RiotAuth.generate_random_string(22),
+                "nonce": token_urlsafe(16),
                 "redirect_uri": "http://localhost/redirect",
                 "response_type": "token id_token",
                 "scope": "openid link ban lol_region account",
@@ -165,69 +194,73 @@ class RiotAuth:
                 json=body,
                 headers=headers,
             ) as r:
-                ...
-
-            body = {
-                "language": "en_US",
-                "password": password,
-                "region": None,
-                "remember": False,
-                "type": "auth",
-                "username": username,
-            }
-            async with session.put(
-                "https://auth.riotgames.com/api/v1/authorization",
-                json=body,
-                headers=headers,
-            ) as r:
                 data: Dict = await r.json()
-                type_ = data["type"]
-                if type_ == "response":
-                    ...
-                elif type_ == "auth":
-                    raise RuntimeError(f"Wrong credentials; `{data.get('error')}`.")
-                elif type_ == "multifactor":
-                    raise NotImplementedError(
-                        "Multifactor authentication is not supported."
-                    )
-                else:
-                    raise NotImplementedError(
-                        f"Unhandled type returned during authentication: `{type_}`."
-                    )
+                resp_type = data["type"]
+            # endregion
 
-            mode = data["response"]["mode"]
-            uri = data["response"]["parameters"]["uri"]
+            if resp_type != "response":  # not reauth
+                # region Authenticate
+                body = {
+                    "language": "en_US",
+                    "password": password,
+                    "region": None,
+                    "remember": False,
+                    "type": "auth",
+                    "username": username,
+                }
+                async with session.put(
+                    "https://auth.riotgames.com/api/v1/authorization",
+                    json=body,
+                    headers=headers,
+                ) as r:
+                    data: Dict = await r.json()
+                    resp_type = data["type"]
+                    if resp_type == "response":
+                        ...
+                    elif resp_type == "auth":
+                        err = data.get("error")
+                        if err == "auth_failure":
+                            raise RiotAuthenticationError(
+                                f"Failed to authenticate. Make sure username and password are correct. `{err}`."
+                            )
+                        elif err == "rate_limited":
+                            raise RiotRatelimitError()
+                        else:
+                            raise RiotUnknownErrorTypeError(
+                                f"Got unknown error `{err}` during authentication."
+                            )
+                    elif resp_type == "multifactor":
+                        raise RiotMultifactorError(
+                            "Multi-factor authentication is not currently supported."
+                        )
+                    else:
+                        raise RiotUnknownResponseTypeError(
+                            f"Got unknown response type `{resp_type}` during authentication."
+                        )
+                # endregion
 
-            result = getattr(urlsplit(uri), mode)
-            data = dict(parse_qsl(result))
-            self.update(extract_jwt=True, **data)
+            self._cookie_jar = session.cookie_jar
+            self.__set_tokens_from_uri(data)
 
+            # region Get new entitlements token
             headers["Authorization"] = f"{self.token_type} {self.access_token}"
-
             async with session.post(
                 "https://entitlements.auth.riotgames.com/api/token/v1",
                 headers=headers,
                 json={},
                 # json={"urn": "urn:entitlement:%"},
             ) as r:
-                entitlements_resp = await r.json()
-                self.entitlements_token = entitlements_resp["entitlements_token"]
+                self.entitlements_token = (await r.json())["entitlements_token"]
+            # endregion
 
+    async def reauthorize(self) -> bool:
+        """
+        Reauthenticate using cookies.
 
-if __name__ == "__main__":
-    import asyncio
-
-    # region Workaround for Windows, remove below 3.8 or above 3.11 beta 1
-    if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-    # endregion
-
-    CREDS = "USERNAME", "PASSWORD"
-
-    auth = RiotAuth()
-    asyncio.run(auth.authorize(*CREDS))
-
-    print(f"Access Token Type: {auth.token_type}")
-    print(f"\nAccess Token: {auth.access_token}")
-    print(f"\nEntitlements Token: {auth.entitlements_token}")
-    print(f"\nUser ID: {auth.user_id}")
+        Returns a ``bool`` indicating success or failure.
+        """
+        try:
+            await self.authorize("", "")
+            return True
+        except RiotAuthenticationError:  # because credentials are empty
+            return False
