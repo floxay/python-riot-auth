@@ -1,4 +1,4 @@
-# python-riot-auth
+# riot-auth
 
 The goal of this project is to bypass Cloudflare's filters (403, error code: 1020).\
 To do this TLS 1.3 cipher suites and signature algorithms are set via ctypes using Python's bundled libssl.\

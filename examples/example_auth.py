@@ -18,5 +18,5 @@ print(f"Access Token: {auth.access_token}\n")
 print(f"Entitlements Token: {auth.entitlements_token}\n")
 print(f"User ID: {auth.user_id}")
 
-# Reauth using cookies.
+# Reauth using cookies. Returns a bool indicating whether the reauth attempt was successful.
 asyncio.run(auth.reauthorize())
