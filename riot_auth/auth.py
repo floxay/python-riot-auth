@@ -93,13 +93,13 @@ class RiotAuth:
         addr = id(ssl_ctx) + sys.getsizeof(object())
         ssl_ctx_addr = ctypes.cast(addr, ctypes.POINTER(ctypes.c_void_p)).contents
 
-        if sys.platform == "win32":
+        if sys.platform.startswith("win32"):
             libssl = ctypes.CDLL("libssl-1_1.dll")
-        elif sys.platform.startswith("linux"):
+        elif sys.platform.startswith(("linux", "darwin")):
             libssl = ctypes.CDLL(ssl._ssl.__file__)
         else:
             raise NotImplementedError(
-                "Only Windows (win32) and Linux (linux) are supported atm."
+                "Only Windows (win32), Linux (linux) and macOS (darwin) are supported."
             )
 
         with warnings.catch_warnings():
