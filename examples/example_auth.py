@@ -3,7 +3,7 @@ import sys
 
 import riot_auth
 
-# region asyncio.run() bug workaround for Windows, remove below 3.8 and above 3.11 beta 1 or on 3.10.6
+# region asyncio.run() bug workaround for Windows, remove below 3.8 and above 3.10.6
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 # endregion

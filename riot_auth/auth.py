@@ -32,7 +32,7 @@ __all__ = (
 
 class RiotAuth:
     RIOT_CLIENT_USER_AGENT = (
-        "RiotClient/56.0.0.4578455.4552318 %s (Windows;10;;Professional, x64)"
+        "RiotClient/58.0.0.4640299.4552318 %s (Windows;10;;Professional, x64)"
     )
     CIPHERS13 = ":".join(  # https://docs.python.org/3/library/ssl.html#tls-1-3
         (
