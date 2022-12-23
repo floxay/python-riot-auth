@@ -1,3 +1,6 @@
+# Copyright (c) 2022 Huba Tuba (floxay)
+# Licensed under the MIT license. Refer to the LICENSE file in the project root for more information.
+
 import ctypes
 import json
 import ssl
@@ -32,7 +35,7 @@ __all__ = (
 
 class RiotAuth:
     RIOT_CLIENT_USER_AGENT = (
-        "RiotClient/60.0.6.4770705.4749685 %s (Windows;10;;Professional, x64)"
+        "RiotClient/62.0.1.4852117.4789131 %s (Windows;10;;Professional, x64)"
     )
     CIPHERS13 = ":".join(  # https://docs.python.org/3/library/ssl.html#tls-1-3
         (
