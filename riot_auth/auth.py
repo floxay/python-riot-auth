@@ -247,6 +247,7 @@ class RiotAuth:
 
             # region Get new entitlements token
             headers["Authorization"] = f"{self.token_type} {self.access_token}"
+            headers["user-agent"] = RiotAuth.RIOT_CLIENT_USER_AGENT % "entitlements"
             async with session.post(
                 "https://entitlements.auth.riotgames.com/api/token/v1",
                 headers=headers,
