@@ -17,6 +17,7 @@ from .auth_exceptions import (
     RiotAuthenticationError,
     RiotAuthError,
     RiotMultifactorError,
+    RiotMultifactorAttemptError,
     RiotRatelimitError,
     RiotUnknownErrorTypeError,
     RiotUnknownResponseTypeError,
@@ -26,6 +27,7 @@ __all__ = (
     "RiotAuthenticationError",
     "RiotAuthError",
     "RiotMultifactorError",
+    "RiotMultifactorAttemptError",
     "RiotRatelimitError",
     "RiotUnknownErrorTypeError",
     "RiotUnknownResponseTypeError",
@@ -35,7 +37,8 @@ __all__ = (
 
 class RiotAuth:
     RIOT_CLIENT_USER_AGENT = (
-        "RiotClient/62.0.1.4852117.4789131 %s (Windows;10;;Professional, x64)"
+        # https://dash.valorant-api.com/endpoints/version
+        "RiotClient/63.0.9.4909983.4789131 %s (Windows;10;;Professional, x64)"
     )
     CIPHERS13 = ":".join(  # https://docs.python.org/3/library/ssl.html#tls-1-3
         (
@@ -233,9 +236,23 @@ class RiotAuth:
                                 f"Got unknown error `{err}` during authentication."
                             )
                     elif resp_type == "multifactor":
-                        raise RiotMultifactorError(
-                            "Multi-factor authentication is not currently supported."
-                        )
+                        promot = "Now wait your email multifactor code and paste it here:\n"
+                        multifactorCode = input(promot)
+                        multiFactorBody = {
+                            "type": "multifactor",
+                            "rememberDevice": "false",
+                            "code": multifactorCode
+                        }
+                        async with session.put(
+                            "https://auth.riotgames.com/api/v1/authorization",
+                            json = multiFactorBody,
+                            headers = headers,
+                        ) as r:
+                            data: Dict = await r.json()
+                            if("error" in data.keys() and data["error"] == "multifactor_attempt_failed"):
+                                raise RiotMultifactorAttemptError(
+                                    "Multi-factor attempt failed, please try again."
+                                )
                     else:
                         raise RiotUnknownResponseTypeError(
                             f"Got unknown response type `{resp_type}` during authentication."
