@@ -16,7 +16,6 @@ import aiohttp
 from .auth_exceptions import (
     RiotAuthenticationError,
     RiotAuthError,
-    RiotMultifactorError,
     RiotMultifactorAttemptError,
     RiotRatelimitError,
     RiotUnknownErrorTypeError,
@@ -26,7 +25,6 @@ from .auth_exceptions import (
 __all__ = (
     "RiotAuthenticationError",
     "RiotAuthError",
-    "RiotMultifactorError",
     "RiotMultifactorAttemptError",
     "RiotRatelimitError",
     "RiotUnknownErrorTypeError",
