@@ -162,7 +162,9 @@ class RiotAuth:
 
     async def __fetch_access_token(
         self, session: aiohttp.ClientSession, body: Dict, headers: Dict, resp_type: str
-    ) -> None:
+    ) -> bool:
+        multifactor_status = False
+
         if resp_type != "response":  # not reauth
             async with session.put(
                 "https://auth.riotgames.com/api/v1/authorization",
@@ -186,17 +188,19 @@ class RiotAuth:
                             f"Got unknown error `{err}` during authentication."
                         )
                 elif resp_type == "multifactor":
-                    raise RiotMultifactorError(
-                        "Multi-factor authentication is not currently supported."
-                    )
+                    multifactor_status = True
                 else:
                     raise RiotUnknownResponseTypeError(
                         f"Got unknown response type `{resp_type}` during authentication."
                     )
 
         self._cookie_jar = session.cookie_jar
-        self.__set_tokens_from_uri(data)
-        await self.__fetch_entitlements_token(session)
+
+        if multifactor_status == False:
+            self.__set_tokens_from_uri(data)
+            await self.__fetch_entitlements_token(session)
+
+        return multifactor_status
 
     async def __fetch_entitlements_token(self, session: aiohttp.ClientSession) -> None:
         headers = {
@@ -217,7 +221,7 @@ class RiotAuth:
 
     async def authorize(
         self, username: str, password: str, use_query_response_mode: bool = False
-    ) -> None:
+    ) -> bool:
         """
         Authenticate using username and password.
         """
@@ -266,7 +270,31 @@ class RiotAuth:
                 "type": "auth",
                 "username": username,
             }
-            await self.__fetch_access_token(session, body, headers, resp_type)
+            return await self.__fetch_access_token(session, body, headers, resp_type)
+
+    async def authorize_mfa(self, code: str) -> None:
+        """
+        Send the 2FA and finish authentication.
+        """
+        conn = aiohttp.TCPConnector(ssl=self._auth_ssl_ctx)
+        async with aiohttp.ClientSession(
+            connector=conn, raise_for_status=True, cookie_jar=self._cookie_jar
+        ) as session:
+            headers = {
+                "Accept-Encoding": "deflate, gzip, zstd",
+                "user-agent": RiotAuth.RIOT_CLIENT_USER_AGENT % "rso-auth",
+                "Cache-Control": "no-cache",
+                "Accept": "application/json",
+            }
+            body = {
+                "type": "multifactor",
+                "rememberDevice": "false",
+                "code": code,
+            }
+            if await self.__fetch_access_token(session, body, headers, resp_type="multifactor"):
+                raise RiotMultifactorAttemptError(
+                    f"Multi-factor attempt failed. Make sure 2FA code is correct."
+                )
 
     async def reauthorize(self) -> bool:
         """
