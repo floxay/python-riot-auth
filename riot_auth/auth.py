@@ -158,6 +158,23 @@ class RiotAuth:
         data = dict(parse_qsl(result))
         self.__update(extract_jwt=True, **data)
 
+    async def __fetch_entitlements_token(self, session: aiohttp.ClientSession) -> None:
+        headers = {
+            "Accept-Encoding": "deflate, gzip, zstd",
+            "user-agent": RiotAuth.RIOT_CLIENT_USER_AGENT % "entitlements",
+            "Cache-Control": "no-cache",
+            "Accept": "application/json",
+            "Authorization": f"{self.token_type} {self.access_token}",
+        }
+
+        async with session.post(
+            "https://entitlements.auth.riotgames.com/api/token/v1",
+            headers=headers,
+            json={},
+            # json={"urn": "urn:entitlement:%"},
+        ) as r:
+            self.entitlements_token = (await r.json())["entitlements_token"]
+
     async def authorize(
         self, username: str, password: str, use_query_response_mode: bool = False
     ) -> None:
@@ -244,18 +261,7 @@ class RiotAuth:
 
             self._cookie_jar = session.cookie_jar
             self.__set_tokens_from_uri(data)
-
-            # region Get new entitlements token
-            headers["Authorization"] = f"{self.token_type} {self.access_token}"
-            headers["user-agent"] = RiotAuth.RIOT_CLIENT_USER_AGENT % "entitlements"
-            async with session.post(
-                "https://entitlements.auth.riotgames.com/api/token/v1",
-                headers=headers,
-                json={},
-                # json={"urn": "urn:entitlement:%"},
-            ) as r:
-                self.entitlements_token = (await r.json())["entitlements_token"]
-            # endregion
+            await self.__fetch_entitlements_token(session)
 
     async def reauthorize(self) -> bool:
         """
