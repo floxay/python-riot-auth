@@ -158,6 +158,44 @@ class RiotAuth:
         data = dict(parse_qsl(result))
         self.__update(extract_jwt=True, **data)
 
+    async def __fetch_access_token(
+        self, session: aiohttp.ClientSession, body: Dict, headers: Dict, resp_type: str
+    ) -> None:
+        if resp_type != "response":  # not reauth
+            async with session.put(
+                "https://auth.riotgames.com/api/v1/authorization",
+                json=body,
+                headers=headers,
+            ) as r:
+                data: Dict = await r.json()
+                resp_type = data["type"]
+                if resp_type == "response":
+                    ...
+                elif resp_type == "auth":
+                    err = data.get("error")
+                    if err == "auth_failure":
+                        raise RiotAuthenticationError(
+                            f"Failed to authenticate. Make sure username and password are correct. `{err}`."
+                        )
+                    elif err == "rate_limited":
+                        raise RiotRatelimitError()
+                    else:
+                        raise RiotUnknownErrorTypeError(
+                            f"Got unknown error `{err}` during authentication."
+                        )
+                elif resp_type == "multifactor":
+                    raise RiotMultifactorError(
+                        "Multi-factor authentication is not currently supported."
+                    )
+                else:
+                    raise RiotUnknownResponseTypeError(
+                        f"Got unknown response type `{resp_type}` during authentication."
+                    )
+
+        self._cookie_jar = session.cookie_jar
+        self.__set_tokens_from_uri(data)
+        await self.__fetch_entitlements_token(session)
+
     async def __fetch_entitlements_token(self, session: aiohttp.ClientSession) -> None:
         headers = {
             "Accept-Encoding": "deflate, gzip, zstd",
@@ -218,50 +256,15 @@ class RiotAuth:
                 resp_type = data["type"]
             # endregion
 
-            if resp_type != "response":  # not reauth
-                # region Authenticate
-                body = {
-                    "language": "en_US",
-                    "password": password,
-                    "region": None,
-                    "remember": False,
-                    "type": "auth",
-                    "username": username,
-                }
-                async with session.put(
-                    "https://auth.riotgames.com/api/v1/authorization",
-                    json=body,
-                    headers=headers,
-                ) as r:
-                    data: Dict = await r.json()
-                    resp_type = data["type"]
-                    if resp_type == "response":
-                        ...
-                    elif resp_type == "auth":
-                        err = data.get("error")
-                        if err == "auth_failure":
-                            raise RiotAuthenticationError(
-                                f"Failed to authenticate. Make sure username and password are correct. `{err}`."
-                            )
-                        elif err == "rate_limited":
-                            raise RiotRatelimitError()
-                        else:
-                            raise RiotUnknownErrorTypeError(
-                                f"Got unknown error `{err}` during authentication."
-                            )
-                    elif resp_type == "multifactor":
-                        raise RiotMultifactorError(
-                            "Multi-factor authentication is not currently supported."
-                        )
-                    else:
-                        raise RiotUnknownResponseTypeError(
-                            f"Got unknown response type `{resp_type}` during authentication."
-                        )
-                # endregion
-
-            self._cookie_jar = session.cookie_jar
-            self.__set_tokens_from_uri(data)
-            await self.__fetch_entitlements_token(session)
+            body = {
+                "language": "en_US",
+                "password": password,
+                "region": None,
+                "remember": False,
+                "type": "auth",
+                "username": username,
+            }
+            await self.__fetch_access_token(session, body, headers, resp_type)
 
     async def reauthorize(self) -> bool:
         """
