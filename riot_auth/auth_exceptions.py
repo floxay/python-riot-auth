@@ -27,6 +27,10 @@ class RiotMultifactorError(RiotAuthError):
     """Error related to multi-factor authentication."""
 
 
+class RiotMultifactorAttemptError(RiotAuthError):
+    """Multi-factor attempt failed."""
+
+
 class RiotUnknownResponseTypeError(RiotAuthError):
     """Unknown response type."""
 
