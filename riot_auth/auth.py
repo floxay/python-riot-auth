@@ -102,6 +102,7 @@ class RiotAuth:
             for dll_name in ("libssl-1_1.dll", "libssl-1_1-x64.dll"):
                 with contextlib.suppress(FileNotFoundError, OSError):
                     libssl = ctypes.CDLL(dll_name)
+                    break
         elif sys.platform.startswith(("linux", "darwin")):
             libssl = ctypes.CDLL(ssl._ssl.__file__) # type: ignore
 
