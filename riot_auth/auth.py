@@ -1,6 +1,7 @@
 # riot-auth Copyright (c) 2022 Huba Tuba (floxay)
 # Licensed under the MIT license. Refer to the LICENSE file in the project root for more information.
 
+import contextlib
 import ctypes
 import json
 import ssl
@@ -96,14 +97,16 @@ class RiotAuth:
         addr = id(ssl_ctx) + sys.getsizeof(object())
         ssl_ctx_addr = ctypes.cast(addr, ctypes.POINTER(ctypes.c_void_p)).contents
 
+        libssl: Optional[ctypes.CDLL] = None
         if sys.platform.startswith("win32"):
-            libssl = ctypes.CDLL("libssl-1_1.dll")
+            for dll_name in ("libssl-1_1.dll", "libssl-1_1-x64.dll"):
+                with contextlib.suppress(FileNotFoundError, OSError):
+                    libssl = ctypes.CDLL(dll_name)
         elif sys.platform.startswith(("linux", "darwin")):
-            libssl = ctypes.CDLL(ssl._ssl.__file__)
-        else:
-            raise NotImplementedError(
-                "Only Windows (win32), Linux (linux) and macOS (darwin) are supported."
-            )
+            libssl = ctypes.CDLL(ssl._ssl.__file__) # type: ignore
+
+        if libssl is None:
+            raise NotImplementedError("Failed to load libssl. Your platform or distribution might be unsupported, please open an issue.")
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
