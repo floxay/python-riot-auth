@@ -12,13 +12,13 @@ async def main() -> None:
 
     multifactor_status = await auth.authorize(*CREDS)
 
-    while multifactor_status == True:
+    while multifactor_status is True:
         # fetching the code must be asynchronous or blocking
         code = await aioconsole.ainput("Input 2fa code: ")
         try:
             await auth.authorize_mfa(code)
             break
-        except riot_auth.RiotMultifactorAttemptError:
+        except riot_auth.RiotMultifactorError:
             print("Invalid 2fa code, please try again")
 
     print(f"Access Token Type: {auth.token_type}\n")
