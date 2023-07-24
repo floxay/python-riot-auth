@@ -23,8 +23,8 @@ class RiotRatelimitError(RiotAuthError):
     """Ratelimit error."""
 
 
-class RiotMultifactorAttemptError(RiotAuthError):
-    """Multi-factor attempt failed."""
+class RiotMultifactorError(RiotAuthError):
+    """Multi-factor failed."""
 
 
 class RiotUnknownResponseTypeError(RiotAuthError):

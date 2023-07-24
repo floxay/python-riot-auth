@@ -17,7 +17,7 @@ import aiohttp
 from .auth_exceptions import (
     RiotAuthenticationError,
     RiotAuthError,
-    RiotMultifactorAttemptError,
+    RiotMultifactorError,
     RiotRatelimitError,
     RiotUnknownErrorTypeError,
     RiotUnknownResponseTypeError,
@@ -26,7 +26,7 @@ from .auth_exceptions import (
 __all__ = (
     "RiotAuthenticationError",
     "RiotAuthError",
-    "RiotMultifactorAttemptError",
+    "RiotMultifactorError",
     "RiotRatelimitError",
     "RiotUnknownErrorTypeError",
     "RiotUnknownResponseTypeError",
@@ -149,6 +149,7 @@ class RiotAuth:
     ) -> List[
         Tuple[str, Union[str, int, List, Dict, None]]
     ]:  # List[Tuple[str, JSONType]]
+        assert self.access_token is not None
         payload = self.access_token.split(".")[1]
         decoded = urlsafe_b64decode(f"{payload}===")
         temp_dict: Dict = json.loads(decoded)
@@ -199,7 +200,7 @@ class RiotAuth:
 
         self._cookie_jar = session.cookie_jar
 
-        if multifactor_status == False:
+        if not multifactor_status:
             self.__set_tokens_from_uri(data)
             await self.__fetch_entitlements_token(session)
 
@@ -294,9 +295,7 @@ class RiotAuth:
                 "code": code,
             }
             if await self.__fetch_access_token(session, body, headers, data={"type": "multifactor"}):
-                raise RiotMultifactorAttemptError(
-                    f"Multi-factor attempt failed. Make sure 2FA code is correct."
-                )
+                raise RiotMultifactorError("Auth with Multi-factor failed. Make sure 2FA code is correct.")
 
     async def reauthorize(self) -> bool:
         """
