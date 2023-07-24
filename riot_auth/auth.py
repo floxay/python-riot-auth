@@ -159,9 +159,10 @@ class RiotAuth:
         self.__update(extract_jwt=True, **data)
 
     async def __fetch_access_token(
-        self, session: aiohttp.ClientSession, body: Dict, headers: Dict, resp_type: str
+        self, session: aiohttp.ClientSession, body: Dict, headers: Dict, data: Dict
     ) -> bool:
         multifactor_status = False
+        resp_type = data["type"]
 
         if resp_type != "response":  # not reauth
             async with session.put(
@@ -257,7 +258,6 @@ class RiotAuth:
                 headers=headers,
             ) as r:
                 data: Dict = await r.json()
-                resp_type = data["type"]
             # endregion
 
             body = {
@@ -268,7 +268,7 @@ class RiotAuth:
                 "type": "auth",
                 "username": username,
             }
-            return await self.__fetch_access_token(session, body, headers, resp_type)
+            return await self.__fetch_access_token(session, body, headers, data)
 
     async def authorize_mfa(self, code: str) -> None:
         """
@@ -289,7 +289,7 @@ class RiotAuth:
                 "rememberDevice": "false",
                 "code": code,
             }
-            if await self.__fetch_access_token(session, body, headers, resp_type="multifactor"):
+            if await self.__fetch_access_token(session, body, headers, data={"type": "multifactor"}):
                 raise RiotMultifactorAttemptError(
                     f"Multi-factor attempt failed. Make sure 2FA code is correct."
                 )
