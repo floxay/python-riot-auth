@@ -16,6 +16,7 @@ CREDS = "USERNAME", "PASSWORD"
 auth = riot_auth.RiotAuth()
 asyncio.run(auth.authorize(*CREDS))
 
+# Note: if you have 2FA enabled, these will be None (see "example_auth_with_2fa_enabled.py"):
 print(f"Access Token Type: {auth.token_type}\n")
 print(f"Access Token: {auth.access_token}\n")
 print(f"Entitlements Token: {auth.entitlements_token}\n")
