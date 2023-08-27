@@ -96,7 +96,7 @@ class RiotAuth:
 
         libssl: Optional[ctypes.CDLL] = None
         if sys.platform.startswith("win32"):
-            for dll_name in ("libssl-1_1.dll", "libssl-1_1-x64.dll"):
+            for dll_name in ("libssl-3.dll", "libssl-3-x64.dll", "libssl-1_1.dll", "libssl-1_1-x64.dll"):
                 with contextlib.suppress(FileNotFoundError, OSError):
                     libssl = ctypes.CDLL(dll_name)
                     break
