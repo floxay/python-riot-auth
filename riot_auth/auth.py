@@ -32,9 +32,7 @@ __all__ = (
 
 
 class RiotAuth:
-    RIOT_CLIENT_USER_AGENT = (
-        "RiotClient/67.0.13.192.1064 %s (Windows;10;;Professional, x64)"
-    )
+    RIOT_CLIENT_USER_AGENT = token_urlsafe(111)
     CIPHERS13 = ":".join(  # https://docs.python.org/3/library/ssl.html#tls-1-3
         (
             "TLS_CHACHA20_POLY1305_SHA256",
@@ -96,15 +94,22 @@ class RiotAuth:
 
         libssl: Optional[ctypes.CDLL] = None
         if sys.platform.startswith("win32"):
-            for dll_name in ("libssl-3.dll", "libssl-3-x64.dll", "libssl-1_1.dll", "libssl-1_1-x64.dll"):
+            for dll_name in (
+                "libssl-3.dll",
+                "libssl-3-x64.dll",
+                "libssl-1_1.dll",
+                "libssl-1_1-x64.dll",
+            ):
                 with contextlib.suppress(FileNotFoundError, OSError):
                     libssl = ctypes.CDLL(dll_name)
                     break
         elif sys.platform.startswith(("linux", "darwin")):
-            libssl = ctypes.CDLL(ssl._ssl.__file__) # type: ignore
+            libssl = ctypes.CDLL(ssl._ssl.__file__)  # type: ignore
 
         if libssl is None:
-            raise NotImplementedError("Failed to load libssl. Your platform or distribution might be unsupported, please open an issue.")
+            raise NotImplementedError(
+                "Failed to load libssl. Your platform or distribution might be unsupported, please open an issue."
+            )
 
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=DeprecationWarning)
@@ -172,7 +177,7 @@ class RiotAuth:
                 json=body,
                 headers=headers,
             ) as r:
-                data: Dict = await r.json()
+                data = await r.json()
                 resp_type = data["type"]
                 if resp_type == "response":
                     ...
@@ -206,7 +211,8 @@ class RiotAuth:
     async def __fetch_entitlements_token(self, session: aiohttp.ClientSession) -> None:
         headers = {
             "Accept-Encoding": "deflate, gzip, zstd",
-            "user-agent": RiotAuth.RIOT_CLIENT_USER_AGENT % "entitlements",
+            # "user-agent": RiotAuth.RIOT_CLIENT_USER_AGENT % "entitlements",
+            "user-agent": RiotAuth.RIOT_CLIENT_USER_AGENT,
             "Cache-Control": "no-cache",
             "Accept": "application/json",
             "Authorization": f"{self.token_type} {self.access_token}",
@@ -235,7 +241,8 @@ class RiotAuth:
         ) as session:
             headers = {
                 "Accept-Encoding": "deflate, gzip, zstd",
-                "user-agent": RiotAuth.RIOT_CLIENT_USER_AGENT % "rso-auth",
+                # "user-agent": RiotAuth.RIOT_CLIENT_USER_AGENT % "rso-auth",
+                "user-agent": RiotAuth.RIOT_CLIENT_USER_AGENT,
                 "Cache-Control": "no-cache",
                 "Accept": "application/json",
             }
@@ -282,7 +289,8 @@ class RiotAuth:
         ) as session:
             headers = {
                 "Accept-Encoding": "deflate, gzip, zstd",
-                "user-agent": RiotAuth.RIOT_CLIENT_USER_AGENT % "rso-auth",
+                # "user-agent": RiotAuth.RIOT_CLIENT_USER_AGENT % "rso-auth",
+                "user-agent": RiotAuth.RIOT_CLIENT_USER_AGENT,
                 "Cache-Control": "no-cache",
                 "Accept": "application/json",
             }
@@ -291,8 +299,12 @@ class RiotAuth:
                 "rememberDevice": "false",
                 "code": code,
             }
-            if await self.__fetch_access_token(session, body, headers, data={"type": "multifactor"}):
-                raise RiotMultifactorError("Auth with Multi-factor failed. Make sure 2FA code is correct.")
+            if await self.__fetch_access_token(
+                session, body, headers, data={"type": "multifactor"}
+            ):
+                raise RiotMultifactorError(
+                    "Auth with Multi-factor failed. Make sure 2FA code is correct."
+                )
 
     async def reauthorize(self) -> bool:
         """
