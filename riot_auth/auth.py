@@ -184,7 +184,9 @@ class RiotAuth:
             async with session.put(
                 "https://auth.riotgames.com/api/v1/authorization",
                 json=body,
-                headers=headers,
+                # credit for the discovery of the necessity of the Referer header goes to @pradishb
+                # original commit in league-client repo: https://github.com/sandbox-pokhara/league-client/commit/34d4c4a48b5925c5c6315e955d37654ad8511210
+                headers=headers | {"referer": "https://authenticate.riotgames.com/"},
             ) as r:
                 data = await r.json()
                 resp_type = data["type"]
