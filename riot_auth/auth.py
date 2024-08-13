@@ -32,7 +32,7 @@ __all__ = (
 
 
 class RiotAuth:
-    RIOT_CLIENT_USER_AGENT = token_urlsafe(111)
+    RIOT_CLIENT_USER_AGENT = token_urlsafe(111).replace("_", "W").replace("-", "w")
     CIPHERS13 = ":".join(  # https://docs.python.org/3/library/ssl.html#tls-1-3
         (
             "TLS_CHACHA20_POLY1305_SHA256",
