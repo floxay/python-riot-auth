@@ -5,7 +5,7 @@ import ssl
 import sys
 import warnings
 from base64 import urlsafe_b64decode
-from secrets import token_urlsafe
+from secrets import token_urlsafe, token_hex
 from typing import Dict, List, Optional, Sequence, Tuple, Union
 from urllib.parse import parse_qsl, urlsplit
 
@@ -186,7 +186,7 @@ class RiotAuth:
                 json=body,
                 # credit for the discovery of the necessity of the Referer header goes to @pradishb
                 # original commit in league-client repo: https://github.com/sandbox-pokhara/league-client/commit/34d4c4a48b5925c5c6315e955d37654ad8511210
-                headers=headers | {"referer": "https://authenticate.riotgames.com/"},
+                headers=headers | {"referer": f"https://{token_hex(5)}.riotgames.com/"},
             ) as r:
                 data = await r.json()
                 resp_type = data["type"]
