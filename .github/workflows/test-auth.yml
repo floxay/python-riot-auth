@@ -1,0 +1,29 @@
+name: Test Auth
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+
+jobs:
+  auth:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    env:
+      RIOT_USERNAME: ${{ secrets.RIOT_USERNAME }}
+      RIOT_PASSWORD: ${{ secrets.RIOT_PASSWORD }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - run: |
+          python -m pip install --upgrade pip
+          pip install git+https://github.com/floxay/python-riot-auth.git
+
+      - run: python ./.github/workflows/test-auth/script.py
