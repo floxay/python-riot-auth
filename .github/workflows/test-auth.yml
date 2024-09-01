@@ -3,7 +3,7 @@ name: Test Auth
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "0 3 * * *"
 
 jobs:
   auth:
