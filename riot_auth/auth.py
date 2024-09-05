@@ -116,7 +116,6 @@ class RiotAuth:
             ssl_ctx.minimum_version = ssl.TLSVersion.TLSv1  # deprecated since 3.10
         ssl_ctx.set_alpn_protocols(["http/1.1"])
         ssl_ctx.options |= 1 << 19  # SSL_OP_NO_ENCRYPT_THEN_MAC
-        ssl_ctx.options |= 1 << 14  # SSL_OP_NO_TICKET
         libssl.SSL_CTX_set_ciphersuites(ssl_ctx_addr, RiotAuth.CIPHERS13.encode())
         libssl.SSL_CTX_set_cipher_list(ssl_ctx_addr, RiotAuth.CIPHERS.encode())
         # setting SSL_CTRL_SET_SIGALGS_LIST
